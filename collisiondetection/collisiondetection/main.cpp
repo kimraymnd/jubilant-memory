@@ -37,7 +37,7 @@ void DoCameraMovement();
 void DoObjectMovement();
 void DoCollisionCheckOne();
 void DoCollisionCheckTwo();
-void ComputeResponse();
+void ComputeResponse(Polytope a, Polytope b);
 
 Camera camera( glm::vec3(0.0f, 0.0f, 3.0f) );
 GLfloat lastX = WIDTH/2.0f;
@@ -48,9 +48,10 @@ bool firstMouse = true;
 GLfloat deltaTime = 0.0f;
 GLfloat lastFrame = 0.0f;
 
-glm::vec3 lightPos(6.0f, 5.0f, 12.0f);
+glm::vec3 lightPos(10.0f, 10.0f, 10.0f);
 
 std::vector<Polytope> objects;
+std::vector<Polytope> boundary;
 
 //*********//
 // INPUTS:
@@ -62,7 +63,7 @@ GLboolean VARYING_SIZE = GL_TRUE;
 
 int main() {
 
-    srand(0);
+    srand(4);
     glfwInit(  );
     
     glfwWindowHint( GLFW_CONTEXT_VERSION_MAJOR, 3);
@@ -162,18 +163,19 @@ int main() {
         -0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f
     };
     
-    glm::vec3 cubePositions[] = {
-        glm::vec3(0.0f, 0.0f, 0.0f),
-        glm::vec3(2.0f, 5.0f, -15.0f),
-        glm::vec3(-1.5f, -2.2f, -2.5f),
-        glm::vec3(-3.8f, -2.0f, -12.3f),
-        glm::vec3(2.4f, -0.4f, -3.5f),
-        glm::vec3(-1.7f, 3.0f, -7.5f),
-        glm::vec3(1.3f, -2.0f, -2.5f),
-        glm::vec3(1.5f, 2.0f, -2.5f),
-        glm::vec3(1.5f, 0.2f, -1.5f),
-        glm::vec3(-1.3f, 1.0f, -1.5f),
-    };
+//    glm::vec3 cubePositions[] = {
+//        glm::vec3(0.0f, 0.0f, 0.0f),
+//        glm::vec3(2.0f, 5.0f, -15.0f),
+//        glm::vec3(-1.5f, -2.2f, -2.5f),
+//        glm::vec3(-3.8f, -2.0f, -12.3f),
+//        glm::vec3(2.4f, -0.4f, -3.5f),
+//        glm::vec3(-1.7f, 3.0f, -7.5f),
+//        glm::vec3(1.3f, -2.0f, -2.5f),
+//        glm::vec3(1.5f, 2.0f, -2.5f),
+//        glm::vec3(1.5f, 0.2f, -1.5f),
+//        glm::vec3(-1.3f, 1.0f, -1.5f),
+//    };
+    
     
     /* VCOLLID STUFF HERE*/
     
@@ -183,9 +185,32 @@ int main() {
     
     /*********************/
     
+
+    
+    //initialize objects
     for (GLuint i = 0; i<numberofObjects; i++) {
-        Polytope obj = Polytope();
-        obj.setPosition(cubePositions[i]);
+        Polytope obj = Polytope((GLfloat)rand()/(GLfloat)(RAND_MAX/4) + 1.0f);
+        
+        bool flag = false;
+        
+        GLfloat px =(GLfloat)rand()/(GLfloat)(RAND_MAX/28) - 14.0f;
+        GLfloat py =(GLfloat)rand()/(GLfloat)(RAND_MAX/28) - 14.0f;
+        GLfloat pz =(GLfloat)rand()/(GLfloat)(RAND_MAX/28) - 14.0f;
+        
+        obj.setPosition(glm::vec3(px, py, pz));
+        
+        for (GLuint j = 0; j < i; j++) {
+            GLfloat dis = glm::length(obj.getPosition()-objects[j].getPosition());
+            GLfloat sum =  obj.getRadius()+objects[j].getRadius();
+            if( dis < sum) {
+                std::cout << i<<":["<<obj.getPosition().x<<", "<<obj.getPosition().y<<", "<<obj.getPosition().z<<"]"<<" is too close to "<<j<<":["<<objects[j].getPosition().x<<", "<<objects[j].getPosition().y<<", "<<objects[j].getPosition().z<<"]"<<"   "<< dis << std::endl;
+                i--;
+                flag = true;
+            }
+        }
+        if (flag) {
+            continue;
+        }
         
         GLfloat pVx =(GLfloat)rand()/(GLfloat)(RAND_MAX/2) - 1.0f;
         GLfloat pVy =(GLfloat)rand()/(GLfloat)(RAND_MAX/2) - 1.0f;
@@ -197,8 +222,48 @@ int main() {
         obj.setangVel((GLfloat)rand()/(GLfloat)(RAND_MAX/5) - 2.5f);
         
         objects.push_back(obj);
-        std::cout << i<<": " << obj.getposVel().x <<" "<<obj.getposVel().y <<" "<<obj.getposVel().z <<" "<<std::endl;
+        std::cout <<"got pushed: "<< i<<": "<< obj.getSize() <<" "<<std::endl;
+  
     }
+    
+    
+//    std::vector<glm::vec3> cubePositions;
+//    for (GLuint i = 0; i < numberofObjects; i++) {
+//        
+//        
+//        
+//        
+//    }
+    
+    
+    //initaize boundary
+    
+    Polytope surface1 = Polytope(30);
+    surface1.setPosition(glm::vec3(-30.0f, 0.0f, 0.0f));
+    Polytope surface2 = Polytope(30);
+    surface1.setPosition(glm::vec3(30.0f, 0.0f, 0.0f));
+    Polytope surface3 = Polytope(30);
+    surface1.setPosition(glm::vec3(0.0f, 30.0f, 0.0f));
+    Polytope surface4 = Polytope(30);
+    surface1.setPosition(glm::vec3(0.0f, -30.0f, 0.0f));
+    Polytope surface5 = Polytope(30);
+    surface1.setPosition(glm::vec3(0.0f, 0.0f, 30.0f));
+    Polytope surface6 = Polytope(30);
+    surface1.setPosition(glm::vec3(0.0f, 0.0f, -30.0f));
+    
+    boundary.push_back(surface1);
+    boundary.push_back(surface2);
+    boundary.push_back(surface3);
+    boundary.push_back(surface4);
+    boundary.push_back(surface5);
+    boundary.push_back(surface6);
+    
+    objects.push_back(surface1);
+    objects.push_back(surface2);
+    objects.push_back(surface3);
+    objects.push_back(surface4);
+    objects.push_back(surface5);
+    objects.push_back(surface6);
     
     GLuint VBO, boxVAO;
     glGenVertexArrays(1, &boxVAO);
@@ -250,7 +315,7 @@ int main() {
         glfwPollEvents();
         
         DoCameraMovement();
-        DoObjectMovement();
+        //DoObjectMovement();
         
         //glClearColor(1.0f, 0.8f, 0.6f, 1.0f);
         glClearColor(0.96f, 0.94f, 0.87f, 1.0f);
@@ -282,13 +347,14 @@ int main() {
         glBindVertexArray(boxVAO);
         
         glUniform4f( objectColorLoc, 0.4f, 0.8f, 1.0f, 0.1f);
-        
+
+//draws oustide box
         glm::mat4 model;
-        model = glm::scale(model, glm::vec3(30.0f));
-        //model = glm::rotate(model, (GLfloat) glfwGetTime( ) * -1.0f, glm::vec3( 1.0f, 0.3f, 0.5f ) );
-        //model = glm::rotate(model, 20.0f * i, glm::vec3( 1.0f, 0.3f, 0.5f ) );
-        glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
-        glDrawArrays(GL_TRIANGLES, 0, 36);
+//        model = glm::scale(model, glm::vec3(30.0f));
+//        //model = glm::rotate(model, (GLfloat) glfwGetTime( ) * -1.0f, glm::vec3( 1.0f, 0.3f, 0.5f ) );
+//        //model = glm::rotate(model, 20.0f * i, glm::vec3( 1.0f, 0.3f, 0.5f ) );
+//        glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
+//        glDrawArrays(GL_TRIANGLES, 0, 36);
         
         
         glBindVertexArray(0);
@@ -298,13 +364,17 @@ int main() {
         for (GLuint i=0; i < numberofObjects; i++) {
             glm::mat4 model;
             model = glm::translate(model, objects[i].getPosition());
+            model = glm::scale(model, glm::vec3(objects[i].getSize()));
             model = glm::rotate(model, (GLfloat) glfwGetTime( ) * objects[i].getangularVel(), objects[i].getrotAxis());
             //model = glm::rotate(model, 20.0f * i, glm::vec3( 1.0f, 0.3f, 0.5f ) );
             glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
             glDrawArrays(GL_TRIANGLES, 0, 36);
         }
         
+        float a = glfwGetTime();
         //DoCollisionCheckOne();
+        float elapsedTime = glfwGetTime() - a;
+//        std::cout << elapsedTime << std::endl;
         
         //DoCollisionCheckTwo();
         
@@ -312,24 +382,24 @@ int main() {
         
         //******************************************************
         
-        sourceShader.Use();
-        
-        modelLoc = glGetUniformLocation(sourceShader.Program, "model");
-        viewLoc = glGetUniformLocation(sourceShader.Program, "view");
-        projLoc = glGetUniformLocation(sourceShader.Program, "projection");
-        
-        glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
-        glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
-        
-        // model;
-        model = glm::mat4();
-        model = glm::translate(model, lightPos);
-        model = glm::scale(model, glm::vec3(0.2f));
-        glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
-        
-        glBindVertexArray(lightVAO);
-        glDrawArrays(GL_TRIANGLES, 0, 36);
-        glBindVertexArray(0);
+//        sourceShader.Use();
+//        
+//        modelLoc = glGetUniformLocation(sourceShader.Program, "model");
+//        viewLoc = glGetUniformLocation(sourceShader.Program, "view");
+//        projLoc = glGetUniformLocation(sourceShader.Program, "projection");
+//        
+//        glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
+//        glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
+//        
+//        // model;
+//        model = glm::mat4();
+//        model = glm::translate(model, lightPos);
+//        model = glm::scale(model, glm::vec3(0.2f));
+//        glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
+//        
+//        glBindVertexArray(lightVAO);
+//        glDrawArrays(GL_TRIANGLES, 0, 36);
+//        glBindVertexArray(0);
         
         // 15:30
 //        glm::mat4 transform;
@@ -374,10 +444,10 @@ void DoCameraMovement() {
         
         camera.ProcessKeyboard(UP, deltaTime);
     }
-    if (keys[GLFW_KEY_LEFT_SHIFT] || keys[GLFW_KEY_RIGHT]) {
-        
-        camera.ProcessKeyboard(DOWN, deltaTime);
-    }
+//    if (keys[GLFW_KEY_LEFT_SHIFT] || keys[GLFW_KEY_RIGHT]) {
+//        
+//        camera.ProcessKeyboard(DOWN, deltaTime);
+//    }
 }
 
 void DoObjectMovement() {
@@ -388,6 +458,37 @@ void DoObjectMovement() {
         objects[i].setPosition(curPos + 0.01f * curVel);
     }
     
+}
+
+void DoCollisionCheckOne() {
+    
+    for (GLuint i = 0; i<numberofObjects-1+6; i++) {
+        for (GLuint j = i+1; j<numberofObjects+6; j++) {
+            if ((GLfloat)(glm::length(objects[i].getPosition()-objects[j].getPosition())) <= (GLfloat)(objects[i].getRadius()+objects[j].getRadius())) {
+                //std::cout << glfwGetTime() <<" - Collision Detected:" << i << " and " << j << std::endl;
+                ComputeResponse(objects[i], objects[j]);
+                
+//                glm::vec3 avel = objects[i].getposVel();
+//                glm::vec3 bvel = objects[j].getposVel();
+//                objects[i].setposVel(-avel);
+//                objects[j].setposVel(-bvel);
+
+                
+            }
+        }
+    }
+}
+
+void ComputeResponse(Polytope a, Polytope b) {
+    //std::cout << "ComputeResponse triggered" << std::endl;
+    glm::vec3 avel = a.getposVel();
+    glm::vec3 bvel = b.getposVel();
+    std::cout << "[" <<a.getposVel().x<<","<<a.getposVel().y<<","<<a.getposVel().z<<"]"<< std::endl;
+    a.setposVel(-avel);
+    std::cout << "[" <<a.getposVel().x<<","<<a.getposVel().y<<","<<a.getposVel().z<<"]"<< std::endl;
+    b.setposVel(-bvel);
+    //std::cout << "posvel for a changed from ["<<avel.x<<","<<avel.y<<","<<avel.z<<"] to [" <<bvel.x<<","<<bvel.y<<","<<bvel.z<<"]" << std::endl;
+    //std::cout << "Directions for "<<&a<<" and "<<&b<<" changed" << std::endl;
 }
 
 
