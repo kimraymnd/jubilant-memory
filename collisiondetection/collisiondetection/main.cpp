@@ -21,6 +21,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include <glm/ext.hpp>
 
 #include "shader.h"
 #include "Camera.h"
@@ -36,8 +37,9 @@ void MouseCallback( GLFWwindow* window, double xPos, double yPos);
 void DoCameraMovement();
 void DoObjectMovement();
 void DoCollisionCheckOne();
-void DoCollisionCheckTwo();
+void DoCollisionCheckTwo(Polytope a, Polytope b);
 void ComputeResponse(Polytope a, Polytope b);
+void TestOverhead();
 
 Camera camera( glm::vec3(0.0f, 0.0f, 3.0f) );
 GLfloat lastX = WIDTH/2.0f;
@@ -56,7 +58,7 @@ std::vector<Polytope> boundary;
 //*********//
 // INPUTS:
  
-GLuint numberofObjects = 10;
+GLuint numberofObjects = 15;
 GLboolean VARYING_SIZE = GL_TRUE;
 
 //*********//
@@ -189,7 +191,7 @@ int main() {
     
     //initialize objects
     for (GLuint i = 0; i<numberofObjects; i++) {
-        Polytope obj = Polytope((GLfloat)rand()/(GLfloat)(RAND_MAX/4) + 1.0f);
+        Polytope obj = Polytope((GLfloat)rand()/(GLfloat)(RAND_MAX/4) + 3.0f);
         
         bool flag = false;
         
@@ -227,28 +229,19 @@ int main() {
     }
     
     
-//    std::vector<glm::vec3> cubePositions;
-//    for (GLuint i = 0; i < numberofObjects; i++) {
-//        
-//        
-//        
-//        
-//    }
-    
-    
     //initaize boundary
     
-    Polytope surface1 = Polytope(30);
+    Polytope surface1 = Polytope(30-0.01);
     surface1.setPosition(glm::vec3(-30.0f, 0.0f, 0.0f));
-    Polytope surface2 = Polytope(30);
+    Polytope surface2 = Polytope(30-0.01);
     surface1.setPosition(glm::vec3(30.0f, 0.0f, 0.0f));
-    Polytope surface3 = Polytope(30);
+    Polytope surface3 = Polytope(30-0.01);
     surface1.setPosition(glm::vec3(0.0f, 30.0f, 0.0f));
-    Polytope surface4 = Polytope(30);
+    Polytope surface4 = Polytope(30-0.01);
     surface1.setPosition(glm::vec3(0.0f, -30.0f, 0.0f));
-    Polytope surface5 = Polytope(30);
+    Polytope surface5 = Polytope(30-0.01);
     surface1.setPosition(glm::vec3(0.0f, 0.0f, 30.0f));
-    Polytope surface6 = Polytope(30);
+    Polytope surface6 = Polytope(30-0.01);
     surface1.setPosition(glm::vec3(0.0f, 0.0f, -30.0f));
     
     boundary.push_back(surface1);
@@ -306,7 +299,12 @@ int main() {
     
     glm::mat4 projection = glm::perspective( camera.getZoom( ), ( GLfloat )SCREEN_WIDTH / ( GLfloat )SCREEN_HEIGHT, 0.1f, 100.0f );
     
+    float sum = 0.0f;
+    
     while (!glfwWindowShouldClose(window)) {
+        
+        
+        
         
         GLfloat currentFrame = glfwGetTime();
         deltaTime = currentFrame - lastFrame;
@@ -315,7 +313,7 @@ int main() {
         glfwPollEvents();
         
         DoCameraMovement();
-        //DoObjectMovement();
+        DoObjectMovement();
         
         //glClearColor(1.0f, 0.8f, 0.6f, 1.0f);
         glClearColor(0.96f, 0.94f, 0.87f, 1.0f);
@@ -372,11 +370,12 @@ int main() {
         }
         
         float a = glfwGetTime();
-        //DoCollisionCheckOne();
+        DoCollisionCheckOne();
         float elapsedTime = glfwGetTime() - a;
-//        std::cout << elapsedTime << std::endl;
+        sum += elapsedTime;
         
-        //DoCollisionCheckTwo();
+        std::cout << sum << std::endl;
+        
         
         glBindVertexArray(0);
         
@@ -464,9 +463,14 @@ void DoCollisionCheckOne() {
     
     for (GLuint i = 0; i<numberofObjects-1+6; i++) {
         for (GLuint j = i+1; j<numberofObjects+6; j++) {
-            if ((GLfloat)(glm::length(objects[i].getPosition()-objects[j].getPosition())) <= (GLfloat)(objects[i].getRadius()+objects[j].getRadius())) {
+            GLfloat dis = glm::length(objects[i].getPosition()-objects[j].getPosition());
+            GLfloat siz = objects[i].getRadius()+objects[j].getRadius();
+            if (dis <= siz) {
                 //std::cout << glfwGetTime() <<" - Collision Detected:" << i << " and " << j << std::endl;
-                ComputeResponse(objects[i], objects[j]);
+                //std::cout << "computing response between "<<i<<", "<<j<<" :::" << glm::to_string(objects[i].getPosition())<<" and "<< glm::to_string(objects[j].getPosition()) << std::endl;
+                DoCollisionCheckTwo(objects[i], objects[j]);
+                
+                
                 
 //                glm::vec3 avel = objects[i].getposVel();
 //                glm::vec3 bvel = objects[j].getposVel();
@@ -479,16 +483,30 @@ void DoCollisionCheckOne() {
     }
 }
 
+void DoCollisionCheckTwo(Polytope a, Polytope b) {
+    bool collide = false;
+    for (GLuint i = 0 ; i < 6; i++) {
+        for (GLuint j = 0; j < 9; j++) {
+            //Do More Exact Computations; will take constant time for its current scope
+            TestOverhead();
+            collide = true;
+        }
+    }
+    if (collide) {
+        ComputeResponse(a, b);
+    }
+}
+
 void ComputeResponse(Polytope a, Polytope b) {
     //std::cout << "ComputeResponse triggered" << std::endl;
     glm::vec3 avel = a.getposVel();
+    float avvel = a.getangularVel();
     glm::vec3 bvel = b.getposVel();
-    std::cout << "[" <<a.getposVel().x<<","<<a.getposVel().y<<","<<a.getposVel().z<<"]"<< std::endl;
+    float bvvel = b.getangularVel();
     a.setposVel(-avel);
-    std::cout << "[" <<a.getposVel().x<<","<<a.getposVel().y<<","<<a.getposVel().z<<"]"<< std::endl;
+    a.setangVel(-avvel);
     b.setposVel(-bvel);
-    //std::cout << "posvel for a changed from ["<<avel.x<<","<<avel.y<<","<<avel.z<<"] to [" <<bvel.x<<","<<bvel.y<<","<<bvel.z<<"]" << std::endl;
-    //std::cout << "Directions for "<<&a<<" and "<<&b<<" changed" << std::endl;
+    b.setangVel(-bvvel);
 }
 
 
@@ -530,7 +548,12 @@ void MouseCallback(GLFWwindow* window, double xPos, double yPos) {
 //    camera.ProcessMouseScroll(yOffset);
 //}
 
-
+void TestOverhead() {
+    glm::vec3 vector(1.0f, 42.5f, 294.f);
+    for (int i=0; i < 10; i++) {
+        vector += vector;
+    }
+}
 
 
 
